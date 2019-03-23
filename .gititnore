@@ -1,0 +1,6 @@
+*
+!.gitignore
+!README.md
+!chenv*
+!git_branch*
+

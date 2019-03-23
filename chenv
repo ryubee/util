@@ -1,0 +1,155 @@
+#!/bin/bash -ue
+
+# Usageを表示
+function usage() {
+  echo $1
+  cat <<_EOT_
+Usage:
+  `basename $0` [-c] [-b] [-l] image_name
+
+Description:
+  XXX
+
+Options:
+  -c docker環境構築
+  -b docker imageのビルド
+  -l docker imageの表示
+  -h ヘルプ表示
+
+_EOT_
+  exit 1
+}
+
+# オプションフラグ用変数初期化
+function initOptionFlags() {
+  for char in {{a..z},{A..Z}}
+  do
+    eval OPT_FLAG_${char}=0;
+  done
+}
+
+# オプション解析結果を表示
+function printOptions() {
+  echo "### 指定オプション一覧"
+  for char in {{a..z},{A..Z}}
+  do
+    opt=$(eval echo \${OPT_FLAG_${char}:-""})
+    optarg=$(eval echo \${OPT_VALUE_${char}:-""})
+    if [[ $opt = 1 ]];then
+      echo "opt=-${char} ${optarg:+optarg=${optarg}}"
+    fi
+  done
+  echo
+}
+
+# RUN \\
+#   sed -i -e "s%http://[^ ]\\+%http://ftp.jp.debian.org/debian/%g" /etc/apt/sources.list \\
+#   && apt-get update \\
+#   && apt-get upgrade -y \\
+#   && apt-get -y --no-install-recommends install \\
+#     ca-certificates curl sudo bash \\
+#   && apt-get autoclean \\
+#   && apt-get autoremove \\
+#   && rm -rf /var/lib/apt/lists/* \\
+#   && echo "%sudo ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+function createProject() {
+  mkdir -p ${HOME}/docker/${1}
+  cat <<_EOT_ > ${HOME}/docker/${1}/Dockerfile
+FROM debian:stretch
+
+ENV DEBIAN_FRONTEND noninteractive
+RUN \\
+  apt-get update \\
+  && apt-get upgrade -y \\
+  && apt-get -y --no-install-recommends install \\
+    ca-certificates curl sudo bash \\
+  && apt-get autoclean \\
+  && apt-get autoremove \\
+  && rm -rf /var/lib/apt/lists/* \\
+  && echo "%sudo ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+CMD ["/bin/bash"]
+_EOT_
+##  docker container run ${DEF_CONTAINER_OPS} ${1}
+}
+
+function lsImage() {
+  docker image ls
+}
+
+function buildImage() {
+  DEF_IMAGE_OPS=" --rm --no-cache --pull "
+  docker image build ${DEF_IMAGE_OPS} -t ${1} ${HOME}/docker/${1}/
+}
+
+function runContainer() {
+  DEF_CONTAINER_OPS="--rm -it -u $(id -u):$(id -g) 
+                    -e IMAGE_NAME=${1}
+                    -h ${1}
+                    -v /etc/group:/etc/group:ro 
+                    -v /etc/passwd:/etc/passwd:ro 
+                    -v /etc/shadow:/etc/shadow:ro 
+                    -v /etc/sudoers.d:/etc/sudoers.d:ro 
+                    -v ${HOME}:${HOME}"
+  docker container run ${DEF_CONTAINER_OPS} ${1}
+}
+
+# オプションフラグ用変数初期化(OPT_FLAG_[a-zA-Z])
+initOptionFlags
+
+# getoptsでの引数判定
+while getopts "lb:c:h" OPT
+do
+  case $OPT in
+    h) usage  "Help"; continue;;
+    :) usage  "[ERROR] Option argument is undefined."; continue;;
+    \?) usage "[ERROR] Undefined options."; continue;;
+  esac
+  # オプション解析
+  eval OPT_FLAG_${OPT}=1;eval OPT_VALUE_${OPT}=${OPTARG:-""}
+done
+
+# getopts分の引数値移動
+shift $(($OPTIND - 1))
+
+# # オプション表示
+# printOptions
+
+# # 引数の数を確認
+# echo "### 引数一覧"
+# for argv in $@
+# do
+#   echo ${argv}
+# done
+
+### main処理
+if [[ $OPT_FLAG_l = 1 ]];then
+  ls ${HOME}/docker
+  exit 0
+fi
+
+if [[ $OPT_FLAG_c = 1 ]];then
+  IMAGE_NAME=${OPT_VALUE_c}
+  createProject ${IMAGE_NAME}
+  echo "Create Docker Direcotry: ${HOME}/docker/${IMAGE_NAME}"
+  exit 0
+fi
+
+if [[ $OPT_FLAG_b = 1 ]];then
+  IMAGE_NAME=${OPT_VALUE_b}
+  buildImage ${IMAGE_NAME}
+
+  exit 0
+fi
+
+IMAGE_NAME=$(echo $@ | cut -f 1)
+if [ -n ${IMAGE_NAME} ]; then
+    echo ${IMAGE_NAME}
+    usage "Set argument"
+    exit 1;
+fi
+
+echo -n "Image Name:"
+echo ${IMAGE_NAME}
+runContainer ${IMAGE_NAME}
