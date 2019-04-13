@@ -148,7 +148,11 @@ if [[ $OPT_FLAG_b = 1 ]];then
 fi
 
 if [[ $OPT_FLAG_d = 1 ]];then
-  echo "command: \$ docker rmi \$(docker images -f \"dangling=true\" -q )"
+  cat <<_EOT_
+command: 
+  \$ docker kill \$(docker ps -qa)
+  \$ docker rmi \$(docker images -f \"dangling=true\" -q )"
+_EOT_
   exit 0
 fi
 
