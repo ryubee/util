@@ -14,6 +14,7 @@ Options:
   -c docker環境構築
   -b docker imageのビルド
   -l docker imageの表示
+  -d clean docker images
   -h ヘルプ表示
 
 _EOT_
@@ -55,7 +56,7 @@ function printOptions() {
 
 function createProject() {
   mkdir -p ${HOME}/docker/${1}
-  cat <<_EOT_ > ${HOME}/docker/${1}/Dockerfile
+  cat <<_EOT_ >> ${HOME}/docker/${1}/Dockerfile
 FROM debian:stretch
 
 ENV DEBIAN_FRONTEND noninteractive
@@ -63,7 +64,8 @@ RUN \\
   apt-get update \\
   && apt-get upgrade -y \\
   && apt-get -y --no-install-recommends install \\
-    ca-certificates curl sudo bash \\
+    ca-certificates vim neovim curl apt-utils bash sudo build-essential xorg dbus dbus-x11 gtk2-engines \\
+    ssh-client screenfetch \\
   && apt-get autoclean \\
   && apt-get autoremove \\
   && rm -rf /var/lib/apt/lists/* \\
@@ -79,14 +81,17 @@ function lsImage() {
 }
 
 function buildImage() {
-  DEF_IMAGE_OPS=" --rm --no-cache --pull "
+  #DEF_IMAGE_OPS=" --rm --no-cache --pull "
+  DEF_IMAGE_OPS=" --rm --no-cache "
   docker image build ${DEF_IMAGE_OPS} -t ${1} ${HOME}/docker/${1}/
 }
 
 function runContainer() {
   DEF_CONTAINER_OPS="--rm -it -u $(id -u):$(id -g) 
                     -e IMAGE_NAME=${1}
+                    -e DISPLAY=${DISPLAY}
                     -h ${1}
+                    -v /tmp/.X11-unix:/tmp/.X11-unix 
                     -v /etc/group:/etc/group:ro 
                     -v /etc/passwd:/etc/passwd:ro 
                     -v /etc/shadow:/etc/shadow:ro 
@@ -99,7 +104,7 @@ function runContainer() {
 initOptionFlags
 
 # getoptsでの引数判定
-while getopts "lb:c:h" OPT
+while getopts "ldb:c:h" OPT
 do
   case $OPT in
     h) usage  "Help"; continue;;
@@ -139,12 +144,17 @@ fi
 if [[ $OPT_FLAG_b = 1 ]];then
   IMAGE_NAME=${OPT_VALUE_b}
   buildImage ${IMAGE_NAME}
-
   exit 0
 fi
 
+if [[ $OPT_FLAG_d = 1 ]];then
+  echo "command: \$ docker rmi \$(docker images -f \"dangling=true\" -q )"
+  exit 0
+fi
+
+
 IMAGE_NAME=$(echo $@ | cut -f 1)
-if [ -n ${IMAGE_NAME} ]; then
+if [ -z ${IMAGE_NAME} ]; then
     echo ${IMAGE_NAME}
     usage "Set argument"
     exit 1;
