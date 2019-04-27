@@ -60,16 +60,27 @@ function createProject() {
 FROM debian:stretch
 
 ENV DEBIAN_FRONTEND noninteractive
+
 RUN \\
   apt-get update \\
   && apt-get upgrade -y \\
   && apt-get -y --no-install-recommends install \\
-    ca-certificates vim neovim curl apt-utils bash sudo build-essential xorg dbus dbus-x11 gtk2-engines \\
-    ssh-client screenfetch \\
-  && apt-get autoclean \\
-  && apt-get autoremove \\
+    bash                sudo                build-essential     vim                 curl                \\
+    ca-certificates     wget                git                 make                apt-utils           \\
+    llvm                screenfetch         wamerican-huge      locales             dbus                \\
+    ssh-client          python3-pip         python-openssl                                              \\
+    libedit-dev         libncurses5-dev     libncursesw5-dev                                            \\
+    libssl-dev          gzip                libbz2-dev          zlib1g              zlib1g-dev          \\
+    xz-utils            tk-dev              libffi-dev          liblzma-dev                             \\
+    xorg                dbus-x11            gtk2-engines        libreadline-dev     libsqlite3-dev      \\
   && rm -rf /var/lib/apt/lists/* \\
   && echo "%sudo ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+RUN locale-gen ja_JP.UTF-8
+ENV LANG ja_JP.UTF-8
+ENV LANGUAGE ja_JP.UTF-8
+ENV LC_ALL ja_JP.UTF-8
+RUN localedef -f UTF-8 -i ja_JP ja_JP.UTF-8
 
 CMD ["/bin/bash"]
 _EOT_
@@ -82,7 +93,8 @@ function lsImage() {
 
 function buildImage() {
   #DEF_IMAGE_OPS=" --rm --no-cache --pull "
-  DEF_IMAGE_OPS=" --rm --no-cache "
+  #DEF_IMAGE_OPS=" --rm --no-cache "
+  DEF_IMAGE_OPS=""
   docker image build ${DEF_IMAGE_OPS} -t ${1} ${HOME}/docker/${1}/
 }
 
